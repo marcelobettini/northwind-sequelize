@@ -88,3 +88,28 @@ test('GET /api/products mantiene la paginación con los includes', async () => {
   assert.equal(body[0].ProductID, all[1].ProductID);
   assert.equal(body[1].ProductID, all[2].ProductID);
 });
+
+test('GET /api/products/:id responde 404 para IDs inexistentes y no canónicos', async () => {
+  for (const id of ['999999', '1abc', '1.0', '01']) {
+    const response = await authFetch(`${baseUrl}/api/products/${id}`);
+
+    assert.equal(response.status, 404, id);
+    const body = await response.json();
+    assert.equal(body.error, 'Producto no encontrado', id);
+  }
+});
+
+test('GET /api/products rechaza paginación inválida con 400', async () => {
+  for (const query of [
+    'limit=0',
+    'limit=1001',
+    'limit=abc',
+    'offset=-1',
+    'limit=1&limit=2',
+    'offset=99999999999999999999',
+  ]) {
+    const response = await authFetch(`${baseUrl}/api/products?${query}`);
+
+    assert.equal(response.status, 400, query);
+  }
+});
