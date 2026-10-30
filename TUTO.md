@@ -723,8 +723,10 @@ export const httpLogger = morgan(format, {
 });
 ```
 
-Morgan no lee body, cookies ni `Authorization`: solo lo que muestra el formato.
-`combined` agrega IP, fecha y user-agent.
+Morgan no lee body, cookies ni tokens: solo lo que muestra el formato.
+`combined` agrega IP, fecha y user-agent; también incluye `:remote-user`, que
+solo registra un usuario si el cliente manda `Authorization: Basic` (esta API
+usa cookie, así que ahí aparece `-`).
 
 En `src/app.js` va **primero**, antes de Helmet y las rutas, para registrar
 también los `401`, los `404` y los preflight de CORS:
@@ -733,16 +735,22 @@ también los `401`, los `404` y los preflight de CORS:
 app.use(httpLogger);
 ```
 
-En `src/middlewares/errorHandler.js`, los `5xx` se registran con contexto:
+En `src/middlewares/errorHandler.js`, los `5xx` se registran con contexto, pero
+**sin pasar el objeto `Error`**: el formato `errors` de Winston copia todas sus
+propiedades enumerables, y un error de Sequelize trae `sql`, `parameters` y
+`parent`.
 
 ```js
-logger.error(err, { method: req.method, url: req.originalUrl });
+logger.error(err?.message ?? String(err), {
+  stack: err?.stack,
+  method: req.method,
+  url: req.originalUrl,
+});
 ```
 
 Los `4xx` no se duplican: ya están en el log de acceso. Nunca se registra el
-body, las cookies ni el objeto crudo de Sequelize (puede incluir SQL y sus
-parámetros). En `src/index.js`, los mensajes de arranque y cierre también pasan
-por el logger.
+body, las cookies ni datos de la consulta SQL. En `src/index.js`, los mensajes
+de arranque y cierre también pasan por el logger.
 
 Configuración:
 
@@ -791,12 +799,13 @@ curl.exe -s -o NUL http://localhost:3000/no-existe
 
 **4. La contraseña no aparece.**
 
-```bash
-curl.exe -s -o NUL -X POST -H "Content-Type: application/json" -d '{"username":"nadie","password":"ClaveSecreta123"}' http://localhost:3000/api/auth/login
+```powershell
+node -e "fetch('http://localhost:3000/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'nadie',password:'ClaveSecreta123'})}).then(r=>console.log(r.status))"
 ```
 
-La línea registra `POST /api/auth/login 401`, pero no `ClaveSecreta123` ni el
-resto del body.
+Se usa `node` y no `curl.exe` porque PowerShell 5.1 se come las comillas dobles
+del JSON. La consola muestra `401` y la línea de log registra
+`POST /api/auth/login 401`, pero no `ClaveSecreta123` ni el resto del body.
 
 **5. El nivel filtra.** Reiniciá con otro nivel:
 

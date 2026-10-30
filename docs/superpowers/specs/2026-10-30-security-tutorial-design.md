@@ -69,8 +69,8 @@ como pendientes. El índice marca el estado de cada uno.
 - Formato legible en desarrollo (color solo si la salida es TTY) y JSON en
   producción.
 - `httpLogger` se monta primero; salta `/health` y respeta `logger.silent`.
-- `errorHandler` registra solo los `5xx`, con método y URL, sin body ni el
-  error crudo de Sequelize.
+- `errorHandler` registra solo los `5xx`, con `message` y `stack` controlados,
+  sin body ni propiedades enumerables del error (SQL, parámetros).
 - `src/index.js` deja de usar `console.*`.
 - `.env.test` con `LOG_LEVEL=silent` y el script de test carga `.env` y
   `.env.test` (el último gana), para no inundar la salida.

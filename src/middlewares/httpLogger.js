@@ -1,5 +1,6 @@
 // Log de acceso HTTP: una línea por petición, escrita en Winston con nivel
-// `http`. No registra body, cookies ni cabeceras Authorization.
+// `http`. No registra body, cookies ni tokens. El formato `combined` incluye
+// `:remote-user`, que solo aporta un usuario con autenticación Basic.
 import morgan from 'morgan';
 import { logger } from '../config/logger.js';
 

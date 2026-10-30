@@ -17,9 +17,14 @@ export function errorHandler(err, req, res, next) {
   const status = err.status ?? 500;
 
   if (status >= 500) {
-    // Se registra el error, nunca el body ni las cookies. Tampoco el objeto
-    // crudo de Sequelize: puede incluir la consulta SQL y sus parámetros.
-    logger.error(err, { method: req.method, url: req.originalUrl });
+    // Solo campos controlados: pasar el Error completo a Winston copia todas
+    // sus propiedades enumerables, y un error de Sequelize incluye `sql` y
+    // `parameters`. Tampoco se registran el body ni las cookies.
+    logger.error(err?.message ?? String(err), {
+      stack: err?.stack,
+      method: req.method,
+      url: req.originalUrl,
+    });
   }
 
   res.status(status).json({

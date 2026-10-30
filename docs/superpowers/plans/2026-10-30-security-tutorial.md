@@ -91,6 +91,7 @@ de los parsers y las rutas, para que aplique a todas las respuestas.
 - Crear: `src/config/logger.js`
 - Crear: `src/middlewares/httpLogger.js`
 - Crear: `.env.test`
+- Crear: `test/logging.test.js`
 - Modificar: `src/app.js` (montar `httpLogger` primero)
 - Modificar: `src/middlewares/errorHandler.js` (usar el logger)
 - Modificar: `src/index.js` (reemplazar `console.*`)
