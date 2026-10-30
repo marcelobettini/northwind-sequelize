@@ -87,6 +87,10 @@ test('GET /api/products mantiene la paginación con los includes', async () => {
   assert.equal(body.length, 2);
   assert.equal(body[0].ProductID, all[1].ProductID);
   assert.equal(body[1].ProductID, all[2].ProductID);
+  assert.deepEqual(body[0].supplier, all[1].supplier);
+  assert.deepEqual(body[0].category, all[1].category);
+  assert.deepEqual(body[1].supplier, all[2].supplier);
+  assert.deepEqual(body[1].category, all[2].category);
 });
 
 test('GET /api/products/:id responde 404 para IDs inexistentes y no canónicos', async () => {
