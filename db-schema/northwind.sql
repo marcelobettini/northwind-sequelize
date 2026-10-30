@@ -303,6 +303,28 @@ CREATE TABLE `territories` (
   CONSTRAINT `FK_Territories_Region` FOREIGN KEY (`RegionID`) REFERENCES `region` (`RegionID`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3;
 /*!40101 SET character_set_client = @saved_cs_client */;
+--
+-- Table structure for table `users`
+--
+
+DROP TABLE IF EXISTS `users`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `users` (
+  `UserID` int NOT NULL AUTO_INCREMENT,
+  `Username` varchar(50) NOT NULL,
+  `Email` varchar(255) NOT NULL,
+  `PasswordHash` varchar(60) NOT NULL,
+  `PasswordChangedAt` datetime DEFAULT NULL,
+  `IsActive` tinyint NOT NULL DEFAULT '1',
+  `CreatedAt` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `UpdatedAt` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`UserID`),
+  UNIQUE KEY `UQ_Users_Username` (`Username`),
+  UNIQUE KEY `UQ_Users_Email` (`Email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

@@ -2,17 +2,28 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { app } from '../src/app.js';
 import { sequelize } from '../src/config/database.js';
+import { createTestUser, deleteTestUser, loginAs } from './helpers/auth.js';
 
 let server;
 let baseUrl;
+let testUser;
+let cookie;
+
+// Envía la cookie de sesión en cada request de la suite.
+const authFetch = (url, init = {}) =>
+  fetch(url, { ...init, headers: { ...init.headers, cookie } });
 
 before(async () => {
   server = app.listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  testUser = await createTestUser();
+  ({ cookie } = await loginAs(baseUrl, testUser.Username));
 });
 
 after(async () => {
+  await deleteTestUser(testUser);
   await new Promise((resolve) => server.close(resolve));
   await sequelize.close();
 });
@@ -88,7 +99,7 @@ const tables = [
 
 for (const table of tables) {
   test(`GET ${table.path} devuelve un array${table.excluded ? ` sin ${table.excluded}` : ''}`, async () => {
-    const response = await fetch(`${baseUrl}${table.path}`);
+    const response = await authFetch(`${baseUrl}${table.path}`);
 
     assert.equal(response.status, 200);
     const body = await response.json();
@@ -105,10 +116,10 @@ for (const table of tables) {
 
   if (table.expectRows) {
     test(`GET ${table.path}/:id devuelve la fila por su PK`, async () => {
-      const rows = await (await fetch(`${baseUrl}${table.path}`)).json();
+      const rows = await (await authFetch(`${baseUrl}${table.path}`)).json();
       const expected = rows.at(-1);
 
-      const response = await fetch(
+      const response = await authFetch(
         `${baseUrl}${table.path}/${encodeURIComponent(expected[table.pk])}`,
       );
 
@@ -123,7 +134,7 @@ for (const table of tables) {
 
   if (Number.isInteger(table.missing)) {
     test(`GET ${table.path}/:id rechaza un ID no numérico con 404`, async () => {
-      const response = await fetch(`${baseUrl}${table.path}/1abc`);
+      const response = await authFetch(`${baseUrl}${table.path}/1abc`);
 
       assert.equal(response.status, 404);
       const body = await response.json();
@@ -132,7 +143,7 @@ for (const table of tables) {
   }
 
   test(`GET ${table.path}/:id responde 404 con el mensaje del controlador`, async () => {
-    const response = await fetch(`${baseUrl}${table.path}/${table.missing}`);
+    const response = await authFetch(`${baseUrl}${table.path}/${table.missing}`);
 
     assert.equal(response.status, 404);
     const body = await response.json();

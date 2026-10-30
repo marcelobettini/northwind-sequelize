@@ -1,0 +1,650 @@
+openapi: 3.0.3
+
+info:
+  title: Northwind API
+  version: 1.0.0
+  description: |
+    Read-only REST API built with Express, Sequelize and MySQL on top of the
+    Northwind database.
+
+    Session-based authentication uses a signed JWT stored in the `access_token`
+    cookie. The authentication endpoints are public; every other `/api`
+    operation requires a valid session cookie.
+
+    This document covers the `auth`, `employees` and `products` resources.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server (default `PORT`)
+
+tags:
+  - name: Auth
+    description: Public user registration, login and logout.
+  - name: Employees
+    description: Read-only access to employee records.
+  - name: Products
+    description: Read-only access to product records.
+
+paths:
+  /api/auth/register:
+    post:
+      tags:
+        - Auth
+      operationId: registerUser
+      summary: Register a new user
+      description: |
+        Creates a new user account. The password is hashed with bcrypt before
+        being stored, and the hash is never returned. Registration does not
+        start a session: the client must call `/api/auth/login` afterwards.
+
+        The username is trimmed and the email is trimmed and lowercased before
+        validation and storage.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created. No session cookie is set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: |
+            Missing required fields, invalid username, invalid email, invalid
+            password or malformed JSON body (`{"error": "JSON inválido"}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: The username or email is already in use.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: El username o email ya está en uso
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/auth/login:
+    post:
+      tags:
+        - Auth
+      operationId: loginUser
+      summary: Authenticate a user
+      description: |
+        Verifies the username and password against the active user account and
+        sets the `access_token` session cookie on success. Inactive users are
+        rejected with the same error as invalid credentials.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated. The session cookie is set in the response.
+          headers:
+            Set-Cookie:
+              description: |
+                Session cookie named `access_token` containing the signed JWT.
+                It is `HttpOnly`, `SameSite=Strict`, scoped to `/`, expires
+                according to `JWT_EXPIRES_IN_SECONDS`, and is `Secure` when
+                `NODE_ENV=production`.
+              schema:
+                type: string
+                example: access_token=<jwt>; Max-Age=43200; Path=/; HttpOnly; SameSite=Strict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: |
+            Missing username or password, or malformed JSON body
+            (`{"error": "JSON inválido"}`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Invalid credentials or inactive user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Credenciales inválidas
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/auth/logout:
+    post:
+      tags:
+        - Auth
+      operationId: logoutUser
+      summary: Log out the current session
+      description: |
+        Clears the `access_token` cookie. This endpoint is public and does not
+        require an active session.
+      security: []
+      responses:
+        '204':
+          description: Session cookie cleared. No response body.
+          headers:
+            Set-Cookie:
+              description: Expired `access_token` cookie that instructs the client to remove it.
+              schema:
+                type: string
+                example: access_token=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/; HttpOnly; SameSite=Strict
+
+  /api/employees:
+    get:
+      tags:
+        - Employees
+      operationId: listEmployees
+      summary: List employees
+      description: |
+        Returns every employee ordered by `EmployeeID` ascending. Each record
+        includes the employee data and a nested `manager` object with the
+        manager's `EmployeeID`, `FirstName` and `LastName`. The `Photo` column
+        is never exposed.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Array of employees.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Employee'
+        '400':
+          $ref: '#/components/responses/BadPagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/employees/{id}:
+    get:
+      tags:
+        - Employees
+      operationId: getEmployeeById
+      summary: Get an employee by ID
+      description: |
+        Returns a single employee including the nested `manager` object. The
+        `Photo` column is never exposed.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Employee found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: |
+            Employee not found. Also returned when the path ID is not a
+            canonical positive integer (for example `1abc`, `01` or `0`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Empleado no encontrado
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/products:
+    get:
+      tags:
+        - Products
+      operationId: listProducts
+      summary: List products
+      description: |
+        Returns every product ordered by `ProductID` ascending. Each record
+        includes the product data plus nested `supplier` and `category`
+        objects. The nested supplier exposes only `CompanyName`, `ContactName`
+        and `Phone`; the nested category exposes only `CategoryName`.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Array of products.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadPagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/products/{id}:
+    get:
+      tags:
+        - Products
+      operationId: getProductById
+      summary: Get a product by ID
+      description: |
+        Returns a single product including the nested `supplier` and `category`
+        objects.
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Product found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: |
+            Product not found. Also returned when the path ID is not a
+            canonical positive integer (for example `1abc`, `01` or `0`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Producto no encontrado
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: |
+        Signed JWT session cookie issued by `/api/auth/login`. The API only
+        verifies the token signature and expiry; it does not query the
+        database on each request.
+
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: |
+        Maximum number of records to return. Must be a numeric string between
+        1 and 1000. When omitted, the endpoint returns every matching record.
+        When `offset` is supplied without `limit`, the server applies the
+        maximum limit of 1000 because MySQL requires a `LIMIT` when using
+        `OFFSET`. Repeated parameters (for example `limit=1&limit=2`) are
+        rejected.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 1000
+
+    Offset:
+      name: offset
+      in: query
+      required: false
+      description: |
+        Number of records to skip. Must be a numeric string representing a
+        non-negative safe integer. Repeated parameters are rejected.
+      schema:
+        type: integer
+        minimum: 0
+
+    ResourceId:
+      name: id
+      in: path
+      required: true
+      description: |
+        Numeric primary key. Only canonical positive decimal integers are
+        accepted; any other value is treated as a non-existent resource and
+        returns 404.
+      schema:
+        type: string
+        pattern: '^[1-9][0-9]*$'
+
+  responses:
+    BadPagination:
+      description: |
+        Invalid pagination parameters (`limit` outside 1-1000 or not an
+        integer, or `offset` not a non-negative safe integer).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: limit debe ser un entero entre 1 y 1000
+
+    Unauthorized:
+      description: Missing, invalid, expired or wrongly signed session cookie.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: No autenticado
+
+    InternalServerError:
+      description: Unexpected server error. Internal details are not exposed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Error interno del servidor
+
+  schemas:
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Human-readable error message.
+
+    RegisterRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          description: |
+            Account username. Leading and trailing whitespace is trimmed. Must
+            be 3 to 50 characters long and contain only letters, numbers,
+            dots, hyphens and underscores.
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9._-]{3,50}$'
+          example: jdoe
+        email:
+          type: string
+          format: email
+          description: |
+            Account email. Trimmed and lowercased before storage. Maximum 255
+            characters and must match a basic email pattern.
+          maxLength: 255
+          example: jdoe@example.com
+        password:
+          type: string
+          format: password
+          description: |
+            Plain-text password. Must be at least 8 characters and at most 72
+            bytes in UTF-8 (bcrypt limit).
+          minLength: 8
+          example: Password123
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: Account username. Leading and trailing whitespace is trimmed.
+          minLength: 1
+          example: jdoe
+        password:
+          type: string
+          format: password
+          description: Plain-text password.
+          minLength: 1
+          example: Password123
+
+    User:
+      type: object
+      required:
+        - UserID
+        - Username
+        - Email
+      properties:
+        UserID:
+          type: integer
+          example: 1
+        Username:
+          type: string
+          example: jdoe
+        Email:
+          type: string
+          format: email
+          example: jdoe@example.com
+
+    AuthResponse:
+      type: object
+      required:
+        - user
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+
+    ManagerRef:
+      type: object
+      description: Manager summary nested in an employee record.
+      required:
+        - EmployeeID
+        - FirstName
+        - LastName
+      properties:
+        EmployeeID:
+          type: integer
+        FirstName:
+          type: string
+          maxLength: 10
+        LastName:
+          type: string
+          maxLength: 20
+
+    Employee:
+      type: object
+      description: |
+        Employee record as returned by the API. The `Photo` database column is
+        excluded. Nullable properties are present with `null` when the
+        database value is `NULL`.
+      required:
+        - EmployeeID
+        - LastName
+        - FirstName
+        - Title
+        - TitleOfCourtesy
+        - BirthDate
+        - HireDate
+        - Address
+        - City
+        - Region
+        - PostalCode
+        - Country
+        - HomePhone
+        - Extension
+        - Notes
+        - ReportsTo
+        - PhotoPath
+        - manager
+      properties:
+        EmployeeID:
+          type: integer
+          example: 1
+        LastName:
+          type: string
+          maxLength: 20
+        FirstName:
+          type: string
+          maxLength: 10
+        Title:
+          type: string
+          maxLength: 30
+          nullable: true
+        TitleOfCourtesy:
+          type: string
+          maxLength: 25
+          nullable: true
+        BirthDate:
+          type: string
+          format: date-time
+          nullable: true
+        HireDate:
+          type: string
+          format: date-time
+          nullable: true
+        Address:
+          type: string
+          maxLength: 60
+          nullable: true
+        City:
+          type: string
+          maxLength: 15
+          nullable: true
+        Region:
+          type: string
+          maxLength: 15
+          nullable: true
+        PostalCode:
+          type: string
+          maxLength: 10
+          nullable: true
+        Country:
+          type: string
+          maxLength: 15
+          nullable: true
+        HomePhone:
+          type: string
+          maxLength: 24
+          nullable: true
+        Extension:
+          type: string
+          maxLength: 4
+          nullable: true
+        Notes:
+          type: string
+          nullable: true
+        ReportsTo:
+          type: integer
+          nullable: true
+          description: EmployeeID of the manager, or `null` when there is no manager.
+        PhotoPath:
+          type: string
+          maxLength: 255
+          nullable: true
+        manager:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/ManagerRef'
+
+    SupplierRef:
+      type: object
+      description: Supplier summary nested in a product record.
+      required:
+        - CompanyName
+        - ContactName
+        - Phone
+      properties:
+        CompanyName:
+          type: string
+          maxLength: 40
+        ContactName:
+          type: string
+          maxLength: 30
+          nullable: true
+        Phone:
+          type: string
+          maxLength: 24
+          nullable: true
+
+    CategoryRef:
+      type: object
+      description: Category summary nested in a product record.
+      required:
+        - CategoryName
+      properties:
+        CategoryName:
+          type: string
+          maxLength: 15
+
+    Product:
+      type: object
+      description: |
+        Product record as returned by the API, including a nested `supplier`
+        and `category` summary.
+      required:
+        - ProductID
+        - ProductName
+        - SupplierID
+        - CategoryID
+        - QuantityPerUnit
+        - UnitPrice
+        - UnitsInStock
+        - UnitsOnOrder
+        - ReorderLevel
+        - Discontinued
+        - supplier
+        - category
+      properties:
+        ProductID:
+          type: integer
+          example: 1
+        ProductName:
+          type: string
+          maxLength: 40
+        SupplierID:
+          type: integer
+          nullable: true
+        CategoryID:
+          type: integer
+          nullable: true
+        QuantityPerUnit:
+          type: string
+          maxLength: 20
+          nullable: true
+        UnitPrice:
+          type: number
+          format: double
+          nullable: true
+        UnitsInStock:
+          type: integer
+          nullable: true
+        UnitsOnOrder:
+          type: integer
+          nullable: true
+        ReorderLevel:
+          type: integer
+          nullable: true
+        Discontinued:
+          type: boolean
+        supplier:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/SupplierRef'
+        category:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/CategoryRef'

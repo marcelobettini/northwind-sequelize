@@ -2,23 +2,34 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { app } from '../src/app.js';
 import { sequelize } from '../src/config/database.js';
+import { createTestUser, deleteTestUser, loginAs } from './helpers/auth.js';
 
 let server;
 let baseUrl;
+let testUser;
+let cookie;
+
+// Envía la cookie de sesión en cada request de la suite.
+const authFetch = (url, init = {}) =>
+  fetch(url, { ...init, headers: { ...init.headers, cookie } });
 
 before(async () => {
   server = app.listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  testUser = await createTestUser();
+  ({ cookie } = await loginAs(baseUrl, testUser.Username));
 });
 
 after(async () => {
+  await deleteTestUser(testUser);
   await new Promise((resolve) => server.close(resolve));
   await sequelize.close();
 });
 
 test('GET /api/employees incluye ReportsTo y el jefe anidado', async () => {
-  const response = await fetch(`${baseUrl}/api/employees`);
+  const response = await authFetch(`${baseUrl}/api/employees`);
 
   assert.equal(response.status, 200);
   const body = await response.json();
@@ -39,7 +50,7 @@ test('GET /api/employees incluye ReportsTo y el jefe anidado', async () => {
 });
 
 test('GET /api/employees devuelve manager null para quien no tiene jefe', async () => {
-  const body = await (await fetch(`${baseUrl}/api/employees`)).json();
+  const body = await (await authFetch(`${baseUrl}/api/employees`)).json();
 
   const topBoss = body.find((employee) => employee.ReportsTo === null);
   assert.ok(topBoss, 'se esperaba al menos un empleado sin jefe');
@@ -48,10 +59,10 @@ test('GET /api/employees devuelve manager null para quien no tiene jefe', async 
 });
 
 test('GET /api/employees/:id incluye el jefe anidado', async () => {
-  const list = await (await fetch(`${baseUrl}/api/employees`)).json();
+  const list = await (await authFetch(`${baseUrl}/api/employees`)).json();
   const subordinate = list.find((employee) => employee.ReportsTo !== null);
 
-  const response = await fetch(`${baseUrl}/api/employees/${subordinate.EmployeeID}`);
+  const response = await authFetch(`${baseUrl}/api/employees/${subordinate.EmployeeID}`);
 
   assert.equal(response.status, 200);
   const body = await response.json();
@@ -62,9 +73,9 @@ test('GET /api/employees/:id incluye el jefe anidado', async () => {
 });
 
 test('GET /api/employees mantiene la paginación con el include', async () => {
-  const all = await (await fetch(`${baseUrl}/api/employees`)).json();
+  const all = await (await authFetch(`${baseUrl}/api/employees`)).json();
 
-  const response = await fetch(`${baseUrl}/api/employees?limit=2&offset=1`);
+  const response = await authFetch(`${baseUrl}/api/employees?limit=2&offset=1`);
 
   assert.equal(response.status, 200);
   const body = await response.json();

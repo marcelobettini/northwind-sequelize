@@ -16,6 +16,7 @@ import { Region } from './region.model.js';
 import { Shipper } from './shipper.model.js';
 import { Supplier } from './supplier.model.js';
 import { Territory } from './territory.model.js';
+import { User } from './user.model.js';
 
 export {
   Category,
@@ -31,6 +32,7 @@ export {
   Shipper,
   Supplier,
   Territory,
+  User,
 };
 
 // products → categories / suppliers

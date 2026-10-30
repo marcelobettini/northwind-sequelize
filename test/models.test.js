@@ -14,6 +14,7 @@ import {
   Shipper,
   Supplier,
   Territory,
+  User,
 } from '../src/models/index.js';
 
 // Cada asociación debe apuntar a la columna declarada como FK en el esquema.
@@ -53,6 +54,16 @@ test('las asociaciones apuntan a las claves foráneas del esquema', () => {
     assert.ok(association, `${model.name}.${alias} no existe`);
     assert.equal(association.foreignKey, foreignKey, `${model.name}.${alias}`);
   }
+});
+
+test('el modelo User coincide con la tabla users', () => {
+  assert.equal(User.getTableName(), 'users');
+  assert.equal(User.rawAttributes.UserID.primaryKey, true);
+  assert.equal(User.rawAttributes.Username.allowNull, false);
+  assert.equal(User.rawAttributes.Email.allowNull, false);
+  assert.equal(User.rawAttributes.PasswordHash.allowNull, false);
+  assert.equal(User.rawAttributes.IsActive.allowNull, false);
+  assert.deepEqual(User.options.defaultScope.attributes.exclude, ['PasswordHash']);
 });
 
 test('las claves primarias y defaults críticos coinciden con el esquema', () => {

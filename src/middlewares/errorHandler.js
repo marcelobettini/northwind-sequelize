@@ -8,6 +8,11 @@ export function notFound(req, res) {
 
 // Express identifica este middleware por sus cuatro parámetros: no quitarlos.
 export function errorHandler(err, req, res, next) {
+  // body-parser no debe exponer el detalle del parser al cliente.
+  if (err.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'JSON inválido' });
+  }
+
   const status = err.status ?? 500;
 
   if (status >= 500) {

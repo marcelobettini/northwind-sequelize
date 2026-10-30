@@ -2,23 +2,34 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { app } from '../src/app.js';
 import { sequelize } from '../src/config/database.js';
+import { createTestUser, deleteTestUser, loginAs } from './helpers/auth.js';
 
 let server;
 let baseUrl;
+let testUser;
+let cookie;
+
+// Envía la cookie de sesión en cada request de la suite.
+const authFetch = (url, init = {}) =>
+  fetch(url, { ...init, headers: { ...init.headers, cookie } });
 
 before(async () => {
   server = app.listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
+
+  testUser = await createTestUser();
+  ({ cookie } = await loginAs(baseUrl, testUser.Username));
 });
 
 after(async () => {
+  await deleteTestUser(testUser);
   await new Promise((resolve) => server.close(resolve));
   await sequelize.close();
 });
 
 test('GET /api/categories devuelve la lista sin el blob Picture', async () => {
-  const response = await fetch(`${baseUrl}/api/categories`);
+  const response = await authFetch(`${baseUrl}/api/categories`);
 
   assert.equal(response.status, 200);
   const body = await response.json();
@@ -30,10 +41,10 @@ test('GET /api/categories devuelve la lista sin el blob Picture', async () => {
 });
 
 test('GET /api/categories/:id devuelve una categoría por su PK', async () => {
-  const list = await (await fetch(`${baseUrl}/api/categories`)).json();
+  const list = await (await authFetch(`${baseUrl}/api/categories`)).json();
   const expected = list.at(-1);
 
-  const response = await fetch(`${baseUrl}/api/categories/${expected.CategoryID}`);
+  const response = await authFetch(`${baseUrl}/api/categories/${expected.CategoryID}`);
 
   assert.equal(response.status, 200);
   const body = await response.json();
@@ -43,7 +54,7 @@ test('GET /api/categories/:id devuelve una categoría por su PK', async () => {
 });
 
 test('GET /api/categories/:id responde 404 propio si la categoría no existe', async () => {
-  const response = await fetch(`${baseUrl}/api/categories/999999`);
+  const response = await authFetch(`${baseUrl}/api/categories/999999`);
 
   assert.equal(response.status, 404);
   const body = await response.json();
@@ -51,9 +62,9 @@ test('GET /api/categories/:id responde 404 propio si la categoría no existe', a
 });
 
 test('GET /api/categories aplica limit y offset', async () => {
-  const all = await (await fetch(`${baseUrl}/api/categories`)).json();
+  const all = await (await authFetch(`${baseUrl}/api/categories`)).json();
 
-  const response = await fetch(`${baseUrl}/api/categories?limit=2&offset=1`);
+  const response = await authFetch(`${baseUrl}/api/categories?limit=2&offset=1`);
 
   assert.equal(response.status, 200);
   const body = await response.json();
@@ -71,14 +82,14 @@ test('GET /api/categories rechaza paginación inválida con 400', async () => {
     'limit=1&limit=2',
     'offset=99999999999999999999',
   ]) {
-    const response = await fetch(`${baseUrl}/api/categories?${query}`);
+    const response = await authFetch(`${baseUrl}/api/categories?${query}`);
     assert.equal(response.status, 400, query);
   }
 });
 
 test('GET /api/categories rechaza IDs no numéricos con 404', async () => {
   for (const id of ['1abc', '1.0', '01']) {
-    const response = await fetch(`${baseUrl}/api/categories/${id}`);
+    const response = await authFetch(`${baseUrl}/api/categories/${id}`);
 
     assert.equal(response.status, 404, id);
     const body = await response.json();
@@ -87,9 +98,9 @@ test('GET /api/categories rechaza IDs no numéricos con 404', async () => {
 });
 
 test('GET /api/categories aplica offset sin limit', async () => {
-  const all = await (await fetch(`${baseUrl}/api/categories`)).json();
+  const all = await (await authFetch(`${baseUrl}/api/categories`)).json();
 
-  const response = await fetch(`${baseUrl}/api/categories?offset=${all.length - 2}`);
+  const response = await authFetch(`${baseUrl}/api/categories?offset=${all.length - 2}`);
 
   assert.equal(response.status, 200);
   const body = await response.json();
