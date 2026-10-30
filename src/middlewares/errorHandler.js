@@ -1,6 +1,7 @@
 // Manejo centralizado de respuestas de error.
 // El detalle se registra solo en el servidor; al cliente nunca se le envían
 // stacks ni mensajes internos de la base de datos.
+import { logger } from '../config/logger.js';
 
 export function notFound(req, res) {
   res.status(404).json({ error: 'Ruta no encontrada' });
@@ -16,7 +17,9 @@ export function errorHandler(err, req, res, next) {
   const status = err.status ?? 500;
 
   if (status >= 500) {
-    console.error(err);
+    // Se registra el error, nunca el body ni las cookies. Tampoco el objeto
+    // crudo de Sequelize: puede incluir la consulta SQL y sus parámetros.
+    logger.error(err, { method: req.method, url: req.originalUrl });
   }
 
   res.status(status).json({

@@ -3,6 +3,7 @@
 // abrir un puerto. Aquí se verifica la conexión y recién entonces se escucha.
 import { app } from './app.js';
 import { sequelize } from './config/database.js';
+import { logger } from './config/logger.js';
 
 const port = Number(process.env.PORT) || 3000;
 
@@ -13,10 +14,10 @@ const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 try {
   await sequelize.authenticate();
-  console.log(`Conexión a la base de datos "${process.env.DB_NAME}" establecida`);
+  logger.info(`Conexión a la base de datos "${process.env.DB_NAME}" establecida`);
 
   const server = app.listen(port, () => {
-    console.log(`API disponible en http://localhost:${port}/api`);
+    logger.info(`API disponible en http://localhost:${port}/api`);
   });
 
   // Cierre ordenado: deja de aceptar conexiones, espera los requests en curso
@@ -35,16 +36,16 @@ try {
   const shutdown = async (signal) => {
     // Si ya hay un cierre en curso, una segunda señal no lo reinicia.
     if (isShuttingDown) {
-      console.log(`${signal} recibida, pero el cierre ya está en curso`);
+      logger.warn(`${signal} recibida, pero el cierre ya está en curso`);
       return;
     }
     isShuttingDown = true;
-    console.log(`${signal} recibida: cerrando servidor...`);
+    logger.info(`${signal} recibida: cerrando servidor...`);
 
     // Red de seguridad: si alguna conexión no termina, no dejamos el proceso
     // colgado. `unref` evita que este timer retrase la salida por sí mismo.
     const forceExit = setTimeout(() => {
-      console.error(`El cierre no terminó en ${SHUTDOWN_TIMEOUT_MS} ms: se fuerza la salida`);
+      logger.error(`El cierre no terminó en ${SHUTDOWN_TIMEOUT_MS} ms: se fuerza la salida`);
       server.closeAllConnections();
       process.exit(1);
     }, SHUTDOWN_TIMEOUT_MS);
@@ -59,7 +60,7 @@ try {
       });
     } catch (error) {
       exitCode = 1;
-      console.error('Error al cerrar el servidor HTTP:', error.message);
+      logger.error('Error al cerrar el servidor HTTP', { error: error.message });
     }
 
     try {
@@ -67,7 +68,7 @@ try {
       await sequelize.close();
     } catch (error) {
       exitCode = 1;
-      console.error('Error al cerrar la base de datos:', error.message);
+      logger.error('Error al cerrar la base de datos', { error: error.message });
     }
 
     clearTimeout(forceExit);
@@ -84,6 +85,6 @@ try {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 } catch (error) {
   // Sin detalle de credenciales: solo el motivo del fallo.
-  console.error('No se pudo conectar a la base de datos:', error.message);
+  logger.error('No se pudo conectar a la base de datos', { error: error.message });
   process.exitCode = 1;
 }
