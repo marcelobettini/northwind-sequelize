@@ -317,6 +317,7 @@ CREATE TABLE `users` (
   `PasswordHash` varchar(60) NOT NULL,
   `PasswordChangedAt` datetime DEFAULT NULL,
   `IsActive` tinyint NOT NULL DEFAULT '1',
+  `IsAdmin` tinyint NOT NULL DEFAULT '0',
   `CreatedAt` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `UpdatedAt` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`UserID`),
