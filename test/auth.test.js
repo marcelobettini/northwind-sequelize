@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { Op } from 'sequelize';
 import { app } from '../src/app.js';
 import { sequelize } from '../src/config/database.js';
+import { requireAdmin } from '../src/middlewares/auth.js';
 import { User } from '../src/models/index.js';
 import {
   TEST_PASSWORD,
@@ -342,6 +343,51 @@ test('un token con sub no numérico responde 401', async () => {
   });
 
   assert.equal(response.status, 401);
+});
+
+test('un token con sub no canónico responde 401', async () => {
+  for (const sub of ['', '0', '01', '1.0', '-1', '1e3', true, null, 1.5, 0]) {
+    const token = jwt.sign({ sub }, process.env.JWT_SECRET, {
+      expiresIn: 3600,
+    });
+    const response = await fetch(`${baseUrl}/api/categories`, {
+      headers: { cookie: `access_token=${token}` },
+    });
+
+    assert.equal(response.status, 401, `sub=${JSON.stringify(sub)}`);
+  }
+});
+
+test('el JWT de sesión solo contiene sub, iat y exp', async () => {
+  const { response } = await loginAs(baseUrl, activeUser.Username);
+  const setCookie = response.headers.getSetCookie()[0];
+  const token = setCookie.match(/^access_token=([^;]+)/)[1];
+
+  const payload = jwt.decode(token);
+  assert.deepEqual(Object.keys(payload).sort(), ['exp', 'iat', 'sub']);
+  assert.equal('IsAdmin' in payload, false);
+});
+
+test('requireAdmin responde 401 si la request no pasó por requireAuth', async () => {
+  let status;
+  let body;
+  const res = {
+    status(code) {
+      status = code;
+      return this;
+    },
+    json(payload) {
+      body = payload;
+      return this;
+    },
+  };
+
+  await requireAdmin({}, res, () => {
+    assert.fail('requireAdmin no debería llamar a next sin req.auth');
+  });
+
+  assert.equal(status, 401);
+  assert.deepEqual(body, { error: 'No autenticado' });
 });
 
 test('un token vencido responde 401', async () => {

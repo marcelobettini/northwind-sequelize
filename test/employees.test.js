@@ -134,3 +134,22 @@ test('un admin desactivado después del login recibe 401', async () => {
 
   await deleteTestUser(user);
 });
+
+test('un admin degradado después del login recibe 403', async () => {
+  const user = await createTestUser({ isAdmin: true });
+  const { cookie: userCookie } = await loginAs(baseUrl, user.Username);
+
+  await User.unscoped().update(
+    { IsAdmin: false },
+    { where: { UserID: user.UserID } },
+  );
+
+  const response = await fetch(`${baseUrl}/api/employees`, {
+    headers: { cookie: userCookie },
+  });
+
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: 'Acceso denegado' });
+
+  await deleteTestUser(user);
+});

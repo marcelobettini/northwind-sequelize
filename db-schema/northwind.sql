@@ -306,6 +306,9 @@ CREATE TABLE `territories` (
 --
 -- Table structure for table `users`
 --
+-- Nota de despliegue: las bases creadas antes de esta versión deben aplicar
+--   ALTER TABLE `users` ADD COLUMN `IsAdmin` tinyint NOT NULL DEFAULT '0' AFTER `IsActive`;
+-- antes de arrancar la aplicación. Este archivo refleja el esquema final.
 
 DROP TABLE IF EXISTS `users`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;

@@ -1,4 +1,4 @@
-// Valida un parámetro de ruta que debe ser un ID numérico.
+// Valida un ID numérico canónico: parámetros de ruta y `sub` del JWT.
 // Devuelve null ante cualquier forma no canónica ("1abc", "1.0", "01", "0",
 // negativos o fuera del rango seguro). Así MySQL no convierte el texto a
 // número y no resuelve una fila que el cliente no pidió.
