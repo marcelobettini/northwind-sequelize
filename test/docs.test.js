@@ -24,3 +24,33 @@ test('GET /openapi.yaml responde el contrato sin autenticación', async () => {
   assert.match(response.headers.get('content-type'), /yaml/);
   assert.match(await response.text(), /^openapi:/);
 });
+
+test('GET /api-docs redirige a /api-docs/ para que resuelvan los assets', async () => {
+  const response = await fetch(`${baseUrl}/api-docs`, { redirect: 'manual' });
+
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get('location'), '/api-docs/');
+});
+
+test('GET /api-docs/ responde la UI sin autenticación', async () => {
+  const response = await fetch(`${baseUrl}/api-docs/`);
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type'), /html/);
+  assert.match(await response.text(), /swagger-ui/);
+});
+
+test('los assets de la UI se sirven bajo /api-docs/', async () => {
+  const response = await fetch(`${baseUrl}/api-docs/swagger-ui.css`);
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type'), /css/);
+});
+
+test('la UI recibe un CSP compatible con Swagger UI', async () => {
+  const response = await fetch(`${baseUrl}/api-docs/`);
+  const csp = response.headers.get('content-security-policy');
+
+  assert.match(csp, /style-src[^;]*'unsafe-inline'/);
+  assert.doesNotMatch(csp, /upgrade-insecure-requests/);
+});

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
 import { apiRouter } from './routes/index.js';
 import { authRouter } from './routes/auth.routes.js';
 import { publicProductRouter } from './routes/product.routes.js';
@@ -43,6 +44,27 @@ app.use(httpLogger);
 app.get('/openapi.yaml', docsSecurity, (req, res) => {
   res.sendFile(API_SPEC_PATH);
 });
+
+const docsEnabled =
+  process.env.NODE_ENV !== 'production' ||
+  process.env.ENABLE_API_DOCS === 'true';
+
+if (docsEnabled) {
+  // La UI usa rutas relativas para sus assets: sin la barra final se piden
+  // en la raíz del sitio y la página queda vacía.
+  app.get(/^\/api-docs$/, (req, res) => {
+    res.redirect('/api-docs/');
+  });
+
+  app.use(
+    '/api-docs',
+    docsSecurity,
+    swaggerUi.serve,
+    swaggerUi.setup(null, {
+      swaggerOptions: { url: '/openapi.yaml' },
+    }),
+  );
+}
 
 // Cabeceras de seguridad en todas las respuestas (CSP, HSTS, nosniff, etc.) y
 // eliminación de X-Powered-By. Va antes de las rutas para que las alcance.
