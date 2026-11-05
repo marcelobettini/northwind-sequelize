@@ -333,6 +333,17 @@ test('un token firmado con otro secreto responde 401', async () => {
   assert.equal(response.status, 401);
 });
 
+test('un token con sub no numérico responde 401', async () => {
+  const token = jwt.sign({ sub: 'abc' }, process.env.JWT_SECRET, {
+    expiresIn: 3600,
+  });
+  const response = await fetch(`${baseUrl}/api/categories`, {
+    headers: { cookie: `access_token=${token}` },
+  });
+
+  assert.equal(response.status, 401);
+});
+
 test('un token vencido responde 401', async () => {
   const token = jwt.sign({ sub: '1' }, process.env.JWT_SECRET, { expiresIn: -1 });
   const response = await fetch(`${baseUrl}/api/categories`, {

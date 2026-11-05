@@ -6,7 +6,7 @@ export const TEST_PASSWORD = 'TestPassword123';
 
 let counter = 0;
 
-export async function createTestUser({ isActive = true } = {}) {
+export async function createTestUser({ isActive = true, isAdmin = false } = {}) {
   counter += 1;
   const suffix = `${process.pid}-${Date.now()}-${counter}`;
 
@@ -16,6 +16,7 @@ export async function createTestUser({ isActive = true } = {}) {
     // Rondas bajas: el costo de bcrypt no aporta nada en tests.
     PasswordHash: await bcrypt.hash(TEST_PASSWORD, 4),
     IsActive: isActive,
+    IsAdmin: isAdmin,
   });
 }
 

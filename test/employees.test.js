@@ -2,12 +2,15 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { app } from '../src/app.js';
 import { sequelize } from '../src/config/database.js';
+import { User } from '../src/models/index.js';
 import { createTestUser, deleteTestUser, loginAs } from './helpers/auth.js';
 
 let server;
 let baseUrl;
 let testUser;
+let regularUser;
 let cookie;
+let regularCookie;
 
 // Envía la cookie de sesión en cada request de la suite.
 const authFetch = (url, init = {}) =>
@@ -18,12 +21,16 @@ before(async () => {
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 
-  testUser = await createTestUser();
+  testUser = await createTestUser({ isAdmin: true });
   ({ cookie } = await loginAs(baseUrl, testUser.Username));
+
+  regularUser = await createTestUser();
+  ({ cookie: regularCookie } = await loginAs(baseUrl, regularUser.Username));
 });
 
 after(async () => {
   await deleteTestUser(testUser);
+  await deleteTestUser(regularUser);
   await new Promise((resolve) => server.close(resolve));
   await sequelize.close();
 });
@@ -82,4 +89,48 @@ test('GET /api/employees mantiene la paginación con el include', async () => {
   assert.equal(body.length, 2);
   assert.equal(body[0].EmployeeID, all[1].EmployeeID);
   assert.equal(body[1].EmployeeID, all[2].EmployeeID);
+});
+
+test('GET /api/employees responde 403 a un usuario sin rol admin', async () => {
+  const response = await fetch(`${baseUrl}/api/employees`, {
+    headers: { cookie: regularCookie },
+  });
+
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: 'Acceso denegado' });
+});
+
+test('GET /api/employees/:id responde 403 a un usuario sin rol admin', async () => {
+  const response = await fetch(`${baseUrl}/api/employees/1`, {
+    headers: { cookie: regularCookie },
+  });
+
+  assert.equal(response.status, 403);
+  assert.deepEqual(await response.json(), { error: 'Acceso denegado' });
+});
+
+test('GET /api/employees responde 401 sin sesión', async () => {
+  const response = await fetch(`${baseUrl}/api/employees`);
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: 'No autenticado' });
+});
+
+test('un admin desactivado después del login recibe 401', async () => {
+  const user = await createTestUser({ isAdmin: true });
+  const { cookie: userCookie } = await loginAs(baseUrl, user.Username);
+
+  await User.unscoped().update(
+    { IsActive: false },
+    { where: { UserID: user.UserID } },
+  );
+
+  const response = await fetch(`${baseUrl}/api/employees`, {
+    headers: { cookie: userCookie },
+  });
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: 'No autenticado' });
+
+  await deleteTestUser(user);
 });

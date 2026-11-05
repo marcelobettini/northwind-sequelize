@@ -18,7 +18,7 @@ before(async () => {
   await new Promise((resolve) => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
 
-  testUser = await createTestUser();
+  testUser = await createTestUser({ isAdmin: true });
   ({ cookie } = await loginAs(baseUrl, testUser.Username));
 });
 
