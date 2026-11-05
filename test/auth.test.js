@@ -219,6 +219,21 @@ test('POST /api/auth/register exige username, email y password', async () => {
   });
 });
 
+test('POST /api/auth/register ignora isAdmin enviado en el body', async () => {
+  const payload = { ...registration(), isAdmin: true };
+  const response = await postJson('/api/auth/register', payload);
+
+  assert.equal(response.status, 201);
+  const body = await response.json();
+  assert.equal('IsAdmin' in body.user, false);
+
+  const user = await User.unscoped().findOne({
+    where: { UserID: body.user.UserID },
+    attributes: ['IsAdmin'],
+  });
+  assert.equal(user.IsAdmin, false);
+});
+
 test('POST /api/auth/login autentica y setea una cookie segura', async () => {
   const response = await postJson('/api/auth/login', {
     username: activeUser.Username,

@@ -63,7 +63,12 @@ test('el modelo User coincide con la tabla users', () => {
   assert.equal(User.rawAttributes.Email.allowNull, false);
   assert.equal(User.rawAttributes.PasswordHash.allowNull, false);
   assert.equal(User.rawAttributes.IsActive.allowNull, false);
-  assert.deepEqual(User.options.defaultScope.attributes.exclude, ['PasswordHash']);
+  assert.equal(User.rawAttributes.IsAdmin.allowNull, false);
+  assert.equal(User.rawAttributes.IsAdmin.defaultValue, false);
+  assert.deepEqual(User.options.defaultScope.attributes.exclude, [
+    'PasswordHash',
+    'IsAdmin',
+  ]);
 });
 
 test('las claves primarias y defaults críticos coinciden con el esquema', () => {

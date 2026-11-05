@@ -12,7 +12,7 @@ export const User = sequelize.define(
     PasswordHash: { type: DataTypes.STRING(60), allowNull: false },
     PasswordChangedAt: { type: DataTypes.DATE },
     IsActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
-    IsAdmin: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false }
+    IsAdmin: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
   },
   {
     tableName: 'users',
