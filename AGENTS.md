@@ -20,6 +20,12 @@ Respect these versions. Do not upgrade major versions or modify dependency const
 - Do not assume relationships exist unless explicitly declared in the schema.
 - Do not modify the database schema or introduce migrations without an explicit requirement.
 
+## API Documentation
+
+- The OpenAPI specification is `src/docs/api-spec.yml`.
+- `swagger-ui-express` is the library available for serving it. Check `src/app.js` before assuming a Swagger UI route exists.
+- The root `docs/` directory belongs to Superpowers (specs and plans). Do not place API documentation there.
+
 ## Dependencies Management
 
 - **Lean Dependencies:** Prefer existing tools over introducing new packages. Add a dependency only when it provides clear value for a concrete requirement.

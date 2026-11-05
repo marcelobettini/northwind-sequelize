@@ -1,6 +1,6 @@
 ---
 name: openapi-doc-generator
-description: Audita el código fuente de un backend REST (rutas, controladores, DTOs, middlewares) y genera o actualiza la especificación OpenAPI en docs/api-spec.yml con análisis de cobertura, detección de discrepancias y validación técnica.
+description: Audita el código fuente de un backend REST (rutas, controladores, DTOs, middlewares) y genera o actualiza la especificación OpenAPI en src/docs/api-spec.yml con análisis de cobertura, detección de discrepancias y validación técnica.
 ---
 
 # Rol
@@ -11,7 +11,7 @@ Actúa como un Principal API Engineer y Technical Writer especializado en diseñ
 
 Generar o actualizar de forma exhaustiva la especificación OpenAPI de la API del proyecto en formato YAML.
 
-El archivo de salida debe guardarse obligatoriamente en `docs/api-spec.yml`, en la raíz del proyecto. Crea la carpeta `docs` si no existe.
+El archivo de salida debe guardarse obligatoriamente en `src/docs/api-spec.yml`, dentro del proyecto. Crea la carpeta `src/docs` si no existe.
 
 # Procedimiento de auditoría y generación
 
@@ -92,9 +92,9 @@ Antes de finalizar:
 
 # Restricciones de alcance
 
-- Guarda el resultado final en `docs/api-spec.yml`.
+- Guarda el resultado final en `src/docs/api-spec.yml`.
 - Si el archivo ya existe, inspecciónalo antes de actualizarlo y conserva las definiciones válidas que sigan correspondiendo al contrato real.
-- Crea `docs` si no existe.
+- Crea `src/docs` si no existe.
 - Modifica únicamente los archivos necesarios para completar la documentación.
 - No modifiques el código fuente ni la lógica de negocio.
 - No instales dependencias ni alteres la configuración del proyecto.
