@@ -8,10 +8,13 @@ info:
     Northwind database.
 
     Session-based authentication uses a signed JWT stored in the `access_token`
-    cookie. The authentication endpoints are public; every other `/api`
-    operation requires a valid session cookie.
+    cookie. The authentication endpoints and the public product catalog are
+    public; every other `/api` operation requires a valid session cookie.
+    Administrative operations (the employee records) additionally require the
+    current user to have the admin role in the database.
 
-    This document covers the `auth`, `employees` and `products` resources.
+    This document covers the `auth`, `employees` and `products` resources,
+    including both the public product catalog and the authenticated one.
 
 servers:
   - url: http://localhost:3000
@@ -174,6 +177,8 @@ paths:
           $ref: '#/components/responses/BadPagination'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -199,6 +204,8 @@ paths:
                 $ref: '#/components/schemas/Employee'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           description: |
             Employee not found. Also returned when the path ID is not a
@@ -279,6 +286,69 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/public/products:
+    get:
+      tags:
+        - Products
+      operationId: listPublicProducts
+      summary: List public products
+      description: |
+        Public catalog. Returns every product ordered by `ProductID` ascending
+        with a reduced projection: `ProductID`, `ProductName`,
+        `QuantityPerUnit`, `UnitPrice` and a nested `category` summary. Supplier
+        data, stock, order and reorder fields are not exposed. No session is
+        required.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Offset'
+      responses:
+        '200':
+          description: Array of public products.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PublicProduct'
+        '400':
+          $ref: '#/components/responses/BadPagination'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/public/products/{id}:
+    get:
+      tags:
+        - Products
+      operationId: getPublicProductById
+      summary: Get a public product by ID
+      description: |
+        Public catalog. Returns a single product with the reduced projection
+        (`ProductID`, `ProductName`, `QuantityPerUnit`, `UnitPrice` and a nested
+        `category` summary). No session is required.
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/ResourceId'
+      responses:
+        '200':
+          description: Product found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicProduct'
+        '404':
+          description: |
+            Product not found. Also returned when the path ID is not a
+            canonical positive integer (for example `1abc`, `01` or `0`).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: Producto no encontrado
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
 components:
   securitySchemes:
     cookieAuth:
@@ -286,9 +356,11 @@ components:
       in: cookie
       name: access_token
       description: |
-        Signed JWT session cookie issued by `/api/auth/login`. The API only
-        verifies the token signature and expiry; it does not query the
-        database on each request.
+        Signed JWT session cookie issued by `/api/auth/login`. For regular
+        authenticated operations the API only verifies the token signature and
+        expiry; it does not query the database on each request. Admin-only
+        operations also verify the current `IsAdmin` and `IsActive` values in
+        the database on every request.
 
   parameters:
     Limit:
@@ -350,6 +422,15 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             error: No autenticado
+
+    Forbidden:
+      description: The session is valid but the user does not have the admin role.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Acceso denegado
 
     InternalServerError:
       description: Unexpected server error. Internal details are not exposed.
@@ -644,6 +725,37 @@ components:
           nullable: true
           allOf:
             - $ref: '#/components/schemas/SupplierRef'
+        category:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/CategoryRef'
+
+    PublicProduct:
+      type: object
+      description: |
+        Reduced product projection exposed by the public catalog. Supplier data,
+        stock, order, reorder and discontinued fields are not included.
+      required:
+        - ProductID
+        - ProductName
+        - QuantityPerUnit
+        - UnitPrice
+        - category
+      properties:
+        ProductID:
+          type: integer
+          example: 1
+        ProductName:
+          type: string
+          maxLength: 40
+        QuantityPerUnit:
+          type: string
+          maxLength: 20
+          nullable: true
+        UnitPrice:
+          type: number
+          format: double
+          nullable: true
         category:
           nullable: true
           allOf:
