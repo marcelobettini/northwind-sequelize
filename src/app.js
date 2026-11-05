@@ -1,5 +1,6 @@
 // Aplicación Express sin `listen`, para poder importarla en las pruebas.
 // El arranque y la conexión a la base de datos viven en src/index.js.
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -11,6 +12,22 @@ import { corsMiddleware } from './middlewares/cors.js';
 import { httpLogger } from './middlewares/httpLogger.js';
 import { errorHandler, notFound } from './middlewares/errorHandler.js';
 
+// La ruta se resuelve desde este módulo para no depender del cwd.
+const API_SPEC_PATH = fileURLToPath(new URL('./docs/api-spec.yml', import.meta.url));
+
+// Swagger UI usa estilos inline que el CSP por defecto de Helmet bloquea.
+// La documentación usa este CSP propio; el resto de la app conserva el estricto.
+const docsSecurity = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:'],
+      upgradeInsecureRequests: null,
+    },
+  },
+});
+
 export const app = express();
 
 // Evita revelar que el servidor usa Express.
@@ -21,6 +38,11 @@ app.disable('x-powered-by');
 // Log de acceso. Va primero para registrar también lo que rechazan los demás
 // middlewares (401, 404, preflight de CORS).
 app.use(httpLogger);
+
+// Documentación: fuera de /api para que no exija sesión.
+app.get('/openapi.yaml', docsSecurity, (req, res) => {
+  res.sendFile(API_SPEC_PATH);
+});
 
 // Cabeceras de seguridad en todas las respuestas (CSP, HSTS, nosniff, etc.) y
 // eliminación de X-Powered-By. Va antes de las rutas para que las alcance.
