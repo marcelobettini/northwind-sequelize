@@ -117,3 +117,67 @@ test('GET /api/products rechaza paginación inválida con 400', async () => {
     assert.equal(response.status, 400, query);
   }
 });
+
+const PUBLIC_PRODUCT_KEYS = [
+  'ProductID',
+  'ProductName',
+  'QuantityPerUnit',
+  'UnitPrice',
+  'category',
+].sort();
+
+test('GET /api/public/products no requiere sesión y usa la proyección reducida', async () => {
+  const response = await fetch(`${baseUrl}/api/public/products`);
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.ok(body.length > 0);
+
+  for (const product of body) {
+    assert.deepEqual(Object.keys(product).sort(), PUBLIC_PRODUCT_KEYS);
+    assert.equal('supplier' in product, false);
+    assert.equal('UnitsInStock' in product, false);
+    assert.equal('Discontinued' in product, false);
+  }
+
+  assert.ok(body.some((product) => product.category !== null));
+});
+
+test('GET /api/public/products/:id devuelve la proyección reducida', async () => {
+  const list = await (await fetch(`${baseUrl}/api/public/products`)).json();
+  const expected = list.find((product) => product.category !== null);
+  assert.ok(expected, 'se esperaba al menos un producto con categoría');
+
+  const response = await fetch(
+    `${baseUrl}/api/public/products/${expected.ProductID}`,
+  );
+
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.deepEqual(Object.keys(body).sort(), PUBLIC_PRODUCT_KEYS);
+  assert.deepEqual(body.category, expected.category);
+});
+
+test('GET /api/public/products/:id responde 404 para IDs no canónicos', async () => {
+  for (const id of ['999999', '1abc', '1.0', '01']) {
+    const response = await fetch(`${baseUrl}/api/public/products/${id}`);
+
+    assert.equal(response.status, 404, id);
+    assert.deepEqual(await response.json(), {
+      error: 'Producto no encontrado',
+    });
+  }
+});
+
+test('GET /api/public/products rechaza paginación inválida con 400', async () => {
+  const response = await fetch(`${baseUrl}/api/public/products?limit=0`);
+
+  assert.equal(response.status, 400);
+});
+
+test('GET /api/products sigue requiriendo sesión', async () => {
+  const response = await fetch(`${baseUrl}/api/products`);
+
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { error: 'No autenticado' });
+});

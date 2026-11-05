@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { apiRouter } from './routes/index.js';
 import { authRouter } from './routes/auth.routes.js';
+import { publicProductRouter } from './routes/product.routes.js';
 import { requireAuth } from './middlewares/auth.js';
 import { corsMiddleware } from './middlewares/cors.js';
 import { httpLogger } from './middlewares/httpLogger.js';
@@ -40,6 +41,7 @@ app.get('/health', (req, res) => {
 
 // El login/logout es público; el resto de /api exige la cookie.
 app.use('/api/auth', authRouter);
+app.use('/api/public/products', publicProductRouter);
 app.use('/api', requireAuth, apiRouter);
 
 // Orden importante: primero 404, luego el manejador de errores.

@@ -17,3 +17,20 @@ export async function getById(req, res) {
 
   res.json(product);
 }
+
+export async function listPublic(req, res) {
+  const products = await productService.findAllPublic(parsePagination(req.query));
+  res.json(products);
+}
+
+export async function getByIdPublic(req, res) {
+  const product = await productService.findByIdPublic(
+    parseIntegerId(req.params.id),
+  );
+
+  if (!product) {
+    return res.status(404).json({ error: 'Producto no encontrado' });
+  }
+
+  res.json(product);
+}

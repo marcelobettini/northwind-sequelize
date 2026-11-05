@@ -6,3 +6,8 @@ export const productRouter = Router();
 
 productRouter.get('/', productController.list);
 productRouter.get('/:id', productController.getById);
+
+export const publicProductRouter = Router();
+
+publicProductRouter.get('/', productController.listPublic);
+publicProductRouter.get('/:id', productController.getByIdPublic);
