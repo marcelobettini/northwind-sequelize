@@ -259,6 +259,7 @@ npm ls express-rate-limit
 |---|---|---|---|
 | `POST /api/auth/login` | solo intentos fallidos | 10 / 15 min | Fuerza bruta y *credential stuffing* |
 | `POST /api/auth/register` | todos los intentos | 30 / hora | DoS con `bcrypt`, cuentas masivas, enumeración |
+| `GET /api/public/products` | todos los requests | 120 / min | Scraping y abuso del catálogo público |
 
 - **Fuerza bruta y *credential stuffing*:** probar contraseñas o listas de
   credenciales filtradas contra `/login`.
@@ -308,15 +309,39 @@ export const registerLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Demasiados registros desde esta IP. Probá más tarde.' },
 });
+
+export const publicProductsLimiter = rateLimit({
+  windowMs: MINUTE_MS,
+  limit: 120,
+  identifier: 'public-products',
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    error: 'Demasiadas solicitudes al catálogo. Probá de nuevo más tarde.',
+  },
+});
 ```
 
-Y se montan por ruta, antes del controlador, en `src/routes/auth.routes.js`:
+Y se montan por ruta, antes del controlador. En `src/routes/auth.routes.js`:
 
 ```js
 authRouter.post('/register', registerLimiter, register);
 authRouter.post('/login', loginLimiter, login);
 authRouter.post('/logout', logout);
 ```
+
+El catálogo público aplica el límite a todo el router en
+`src/routes/product.routes.js`:
+
+```js
+publicProductRouter.use(publicProductsLimiter, publicCatalogCache);
+publicProductRouter.get('/', productController.listPublic);
+publicProductRouter.get('/:id', productController.getByIdPublic);
+```
+
+Además del límite, el catálogo devuelve como máximo 100 filas por request y
+responde con `Cache-Control: public, max-age=60`; Express mantiene el `ETag`,
+así que un cliente puede revalidar y recibir `304` sin cuerpo.
 
 Cada opción:
 

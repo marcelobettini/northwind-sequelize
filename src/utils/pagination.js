@@ -1,7 +1,7 @@
 // Traduce y valida los parámetros opcionales ?limit y ?offset.
 // Sin parámetros no se pagina: el listado devuelve todas las filas.
-// Si llega offset sin limit se aplica MAX_LIMIT, porque MySQL exige un
-// LIMIT cuando se usa OFFSET.
+// Si llega offset sin limit se aplica maxLimit, porque MySQL exige un
+// LIMIT cuando se usa OFFSET. Cada endpoint puede imponer un tope menor.
 import { HttpError } from './httpError.js';
 
 export const MAX_LIMIT = 1000;
@@ -17,13 +17,13 @@ function parseNonNegativeInteger(value) {
   return Number.isSafeInteger(parsed) ? parsed : null;
 }
 
-export function parsePagination({ limit, offset } = {}) {
+export function parsePagination({ limit, offset } = {}, maxLimit = MAX_LIMIT) {
   const options = {};
 
   if (limit !== undefined) {
     const value = parseNonNegativeInteger(limit);
-    if (value === null || value < 1 || value > MAX_LIMIT) {
-      throw new HttpError(400, `limit debe ser un entero entre 1 y ${MAX_LIMIT}`);
+    if (value === null || value < 1 || value > maxLimit) {
+      throw new HttpError(400, `limit debe ser un entero entre 1 y ${maxLimit}`);
     }
     options.limit = value;
   }
@@ -34,7 +34,7 @@ export function parsePagination({ limit, offset } = {}) {
       throw new HttpError(400, 'offset debe ser un entero mayor o igual a 0');
     }
     options.offset = value;
-    options.limit ??= MAX_LIMIT;
+    options.limit ??= maxLimit;
   }
 
   return options;

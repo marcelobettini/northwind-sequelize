@@ -298,9 +298,13 @@ paths:
         `QuantityPerUnit`, `UnitPrice` and a nested `category` summary. Supplier
         data, stock, order and reorder fields are not exposed. No session is
         required.
+
+        The endpoint is rate limited per client (120 requests per minute) and
+        successful responses are cacheable (`Cache-Control: public, max-age=60`).
+        At most 100 products can be requested at once.
       security: []
       parameters:
-        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/PublicLimit'
         - $ref: '#/components/parameters/Offset'
       responses:
         '200':
@@ -313,6 +317,8 @@ paths:
                   $ref: '#/components/schemas/PublicProduct'
         '400':
           $ref: '#/components/responses/BadPagination'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -326,6 +332,9 @@ paths:
         Public catalog. Returns a single product with the reduced projection
         (`ProductID`, `ProductName`, `QuantityPerUnit`, `UnitPrice` and a nested
         `category` summary). No session is required.
+
+        The endpoint is rate limited per client (120 requests per minute) and
+        successful responses are cacheable (`Cache-Control: public, max-age=60`).
       security: []
       parameters:
         - $ref: '#/components/parameters/ResourceId'
@@ -346,6 +355,8 @@ paths:
                 $ref: '#/components/schemas/Error'
               example:
                 error: Producto no encontrado
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
 
@@ -379,6 +390,22 @@ components:
         minimum: 1
         maximum: 1000
 
+    PublicLimit:
+      name: limit
+      in: query
+      required: false
+      description: |
+        Maximum number of records to return from the public catalog. Must be a
+        numeric string between 1 and 100. When omitted, the endpoint returns
+        every matching record (up to the catalog size). When `offset` is
+        supplied without `limit`, the server applies the maximum public limit
+        of 100 because MySQL requires a `LIMIT` when using `OFFSET`. Repeated
+        parameters (for example `limit=1&limit=2`) are rejected.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+
     Offset:
       name: offset
       in: query
@@ -405,7 +432,8 @@ components:
   responses:
     BadPagination:
       description: |
-        Invalid pagination parameters (`limit` outside 1-1000 or not an
+        Invalid pagination parameters (`limit` outside the endpoint's allowed
+        range —1-1000, or 1-100 for the public catalog—, `limit` not an
         integer, or `offset` not a non-negative safe integer).
       content:
         application/json:
@@ -413,6 +441,23 @@ components:
             $ref: '#/components/schemas/Error'
           example:
             error: limit debe ser un entero entre 1 y 1000
+
+    TooManyRequests:
+      description: |
+        The client exceeded the request quota for this endpoint. The response
+        includes `Retry-After` with the number of seconds to wait before
+        retrying.
+      headers:
+        Retry-After:
+          description: Seconds to wait before sending another request.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Demasiadas solicitudes al catálogo. Probá de nuevo más tarde.
 
     Unauthorized:
       description: Missing, invalid, expired or wrongly signed session cookie.

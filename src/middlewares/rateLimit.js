@@ -31,3 +31,18 @@ export const registerLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Demasiados registros desde esta IP. Probá más tarde.' },
 });
+
+// Catálogo público: lectura sin sesión. Se cuentan todos los requests porque
+// cada uno consulta la base; no hay respuestas que se puedan descontar. 120
+// por minuto y por cliente dejan usar el catálogo a un frontend real y a
+// varias personas detrás de una misma IP, pero cortan el scraping sistemático.
+export const publicProductsLimiter = rateLimit({
+  windowMs: MINUTE_MS,
+  limit: 120,
+  identifier: 'public-products',
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: {
+    error: 'Demasiadas solicitudes al catálogo. Probá de nuevo más tarde.',
+  },
+});

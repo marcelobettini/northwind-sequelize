@@ -175,6 +175,30 @@ test('GET /api/public/products rechaza paginación inválida con 400', async () 
   assert.equal(response.status, 400);
 });
 
+test('GET /api/public/products limita la paginación a 100', async () => {
+  const allowed = await fetch(`${baseUrl}/api/public/products?limit=100`);
+  assert.equal(allowed.status, 200);
+
+  const rejected = await fetch(`${baseUrl}/api/public/products?limit=101`);
+  assert.equal(rejected.status, 400);
+  assert.deepEqual(await rejected.json(), {
+    error: 'limit debe ser un entero entre 1 y 100',
+  });
+});
+
+test('GET /api/public/products envía Cache-Control público', async () => {
+  for (const path of ['/api/public/products', '/api/public/products/1']) {
+    const response = await fetch(`${baseUrl}${path}`);
+
+    assert.equal(response.status, 200, path);
+    assert.equal(
+      response.headers.get('cache-control'),
+      'public, max-age=60',
+      path,
+    );
+  }
+});
+
 test('GET /api/products sigue requiriendo sesión', async () => {
   const response = await fetch(`${baseUrl}/api/products`);
 

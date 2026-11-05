@@ -4,7 +4,10 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { app } from '../src/app.js';
 import { sequelize } from '../src/config/database.js';
-import { loginLimiter } from '../src/middlewares/rateLimit.js';
+import {
+  loginLimiter,
+  publicProductsLimiter,
+} from '../src/middlewares/rateLimit.js';
 import { TEST_PASSWORD, createTestUser, deleteTestUser } from './helpers/auth.js';
 
 // Las pruebas se conectan desde 127.0.0.1; ese es el cliente que cuenta el
@@ -104,4 +107,32 @@ test('el registro bloquea con 429 después de 30 intentos', async () => {
     error: 'Demasiados registros desde esta IP. Probá más tarde.',
   });
   assert.match(blocked.headers.get('ratelimit-policy'), /^"register"; q=30; w=3600/);
+});
+
+test('el catálogo público bloquea con 429 después de 120 requests por minuto', async () => {
+  await publicProductsLimiter.resetKey(CLIENT_IP);
+
+  // `limit=1` mantiene liviana cada consulta: lo que se prueba es la cuota,
+  // no el tamaño de la respuesta.
+  const attempts = [];
+  for (let i = 0; i < 120; i += 1) {
+    attempts.push(await fetch(`${baseUrl}/api/public/products?limit=1`));
+  }
+
+  assert.deepEqual(
+    attempts.map((response) => response.status),
+    Array(120).fill(200),
+  );
+
+  const blocked = await fetch(`${baseUrl}/api/public/products?limit=1`);
+
+  assert.equal(blocked.status, 429);
+  assert.deepEqual(await blocked.json(), {
+    error: 'Demasiadas solicitudes al catálogo. Probá de nuevo más tarde.',
+  });
+  assert.match(
+    blocked.headers.get('ratelimit-policy'),
+    /^"public-products"; q=120; w=60/,
+  );
+  assert.ok(Number(blocked.headers.get('retry-after')) > 0);
 });
