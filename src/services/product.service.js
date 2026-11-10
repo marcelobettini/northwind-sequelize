@@ -55,3 +55,7 @@ export function findByIdPublic(id) {
     include: [getCategoryInclude()],
   });
 }
+
+export function create(productData) {
+  return Product.create(productData);
+}

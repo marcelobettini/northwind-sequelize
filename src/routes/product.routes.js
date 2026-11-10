@@ -8,6 +8,7 @@ export const productRouter = Router();
 
 productRouter.get('/', productController.list);
 productRouter.get('/:id', productController.getById);
+productRouter.post('/', productController.create);
 
 export const publicProductRouter = Router();
 

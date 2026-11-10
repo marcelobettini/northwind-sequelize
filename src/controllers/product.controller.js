@@ -40,3 +40,8 @@ export async function getByIdPublic(req, res) {
 
   res.json(product);
 }
+
+export async function create(req, res) {
+  const product = await productService.create(req.body);
+  res.status(201).json(product);
+}
