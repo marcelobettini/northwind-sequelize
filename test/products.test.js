@@ -2,6 +2,7 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { app } from '../src/app.js';
 import { sequelize } from '../src/config/database.js';
+import { Product } from '../src/models/index.js';
 import { createTestUser, deleteTestUser, loginAs } from './helpers/auth.js';
 
 let server;
@@ -204,4 +205,81 @@ test('GET /api/products sigue requiriendo sesión', async () => {
 
   assert.equal(response.status, 401);
   assert.deepEqual(await response.json(), { error: 'No autenticado' });
+});
+
+test('POST /api/products crea el producto y devuelve el registro almacenado', async () => {
+  const response = await authFetch(`${baseUrl}/api/products`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ProductName: 'ZZ-TEST-CREATE', UnitPrice: 12.5 }),
+  });
+
+  assert.equal(response.status, 201);
+  const body = await response.json();
+
+  assert.ok(Number.isInteger(body.ProductID));
+  assert.equal(body.ProductName, 'ZZ-TEST-CREATE');
+  assert.equal(body.UnitPrice, 12.5);
+
+  await Product.destroy({ where: { ProductID: body.ProductID } });
+});
+
+test('POST /api/products traduce una FK inexistente a 400 con el campo', async () => {
+  for (const field of ['SupplierID', 'CategoryID']) {
+    const response = await authFetch(`${baseUrl}/api/products`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ProductName: 'ZZ-TEST-FK', [field]: 999999 }),
+    });
+
+    assert.equal(response.status, 400, field);
+    assert.deepEqual(await response.json(), { error: `${field} no existe` }, field);
+  }
+});
+
+test('POST /api/products rechaza ProductID con 400 porque lo genera la base', async () => {
+  const response = await authFetch(`${baseUrl}/api/products`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ProductName: 'ZZ-TEST-DUP', ProductID: 1 }),
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: 'Unrecognized key: "ProductID"',
+  });
+});
+
+test('POST /api/products rechaza valores con tipo o rango inválidos', async () => {
+  for (const [field, value, message] of [
+    ['SupplierID', 'abc', 'Invalid input: expected number, received string'],
+    ['QuantityPerUnit', 1, 'Invalid input: expected string, received number'],
+    ['UnitPrice', -0.01, 'Too small: expected number to be >=0'],
+    ['UnitsInStock', 40000, 'Too big: expected number to be <=32767'],
+    ['UnitsInStock', -1, 'Too small: expected number to be >=0'],
+    ['UnitsOnOrder', -1, 'Too small: expected number to be >=0'],
+    ['ReorderLevel', -1, 'Too small: expected number to be >=0'],
+  ]) {
+    const response = await authFetch(`${baseUrl}/api/products`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ProductName: 'ZZ-TEST-INV', [field]: value }),
+    });
+
+    assert.equal(response.status, 400, field);
+    assert.deepEqual(await response.json(), { error: message }, field);
+  }
+});
+
+test('POST /api/products rechaza un campo obligatorio ausente con 400', async () => {
+  const response = await authFetch(`${baseUrl}/api/products`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ UnitPrice: 10 }),
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: 'Invalid input: expected string, received undefined',
+  });
 });

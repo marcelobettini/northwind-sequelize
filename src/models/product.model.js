@@ -1,4 +1,4 @@
-// Modelo de solo lectura de `products`.
+
 // `Discontinued` es tinyint(1) en MySQL; Sequelize lo expone como booleano.
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../config/database.js';
